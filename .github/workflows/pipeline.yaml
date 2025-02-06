@@ -7,7 +7,7 @@ on:
       - main
       - develop
       - releases/**
-    tags:        
+    tags:
       - v*
 
 env:
@@ -15,7 +15,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # Uses GitHub-hosted runner
+    runs-on: ubuntu-22.04 # Uses GitHub-hosted runner
     environment: dev
     permissions:
       contents: read
@@ -38,21 +38,20 @@ jobs:
           if [[ $GITHUB_REF == "refs/heads/main" ]]; then
             echo "env=uat" >> $GITHUB_OUTPUT
             echo "image_tag=uat-$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_OUTPUT
-            echo "repo=miw1513/k8s-calculator-nonprd" >> $GITHUB_OUTPUT
-            echo "path_repo=k8s-calculator-nonprd" >> $GITHUB_OUTPUT
+            echo "repo=drafttreesoon/k8s-app-nonprod" >> $GITHUB_OUTPUT
+            echo "path_repo=k8s-app-nonprod" >> $GITHUB_OUTPUT
           elif [[ $GITHUB_EVENT_NAME == "push" && $GITHUB_REF == "refs/tags/"* ]]; then
             echo "image_tag=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
             echo "ref_tag=uat-$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_OUTPUT
             echo "env=prd" >> $GITHUB_OUTPUT
-            echo "repo=miw1513/k8s-calculator-prd" >> $GITHUB_OUTPUT
+            echo "repo=drafttreesoon/k8s-calculator-prd" >> $GITHUB_OUTPUT
             echo "path_repo=k8s-calculator-prd" >> $GITHUB_OUTPUT
           else
             echo "image_tag=dev-$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_OUTPUT
             echo "env=dev" >> $GITHUB_OUTPUT
-            echo "repo=miw1513/k8s-calculator-nonprd" >> $GITHUB_OUTPUT
-            echo "path_repo=k8s-calculator-nonprd" >> $GITHUB_OUTPUT
+            echo "repo=drafttreesoon/k8s-app-nonprod" >> $GITHUB_OUTPUT
+            echo "path_repo=k8s-app-nonprod" >> $GITHUB_OUTPUT
           fi
-
 
       - name: Build Rust and Push (Develop)
         if: ${{ github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'  }}
@@ -83,10 +82,10 @@ jobs:
     needs: build
     # if: ${{ ( github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/' || github.ref == 'refs/heads/main' ) )  }}
     name: Update Tag and Deploy
-    runs-on: ubuntu-24.04  # Uses GitHub-hosted runner
+    runs-on: ubuntu-24.04 # Uses GitHub-hosted runner
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
 
     steps:
       - name: Check out my other private repo
@@ -97,7 +96,6 @@ jobs:
           path: ${{ needs.build.outputs.path_repo }}
           ref: main
 
-
       - name: Update image from registry
         working-directory: ${{ needs.build.outputs.path_repo }}
         env:
@@ -105,13 +103,13 @@ jobs:
         run: |-
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
           sudo chmod +x /usr/bin/yq
-          for file in $(find ./helm-values -type f -name '*.yaml'); do
+          for file in $(find ./values -type f -name '*.yaml'); do
             ENV=$(yq e '.ENV' $file)
             if [ "$ENV" = "${{ needs.build.outputs.env }}" ]; then
               yq e -i '.API.tag = strenv(IMAGE)' $file
             fi
           done
-      
+
       - name: Update repository
         working-directory: ${{ needs.build.outputs.path_repo }}
         run: |-
@@ -120,5 +118,3 @@ jobs:
           git add .
           git commit -am "release: ${{ env.IMAGE_NAME }} env: ${{ needs.build.outputs.env }} version: ${{ needs.build.outputs.image_tag }}"
           git push origin main
-
-
